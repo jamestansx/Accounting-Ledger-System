@@ -222,19 +222,15 @@ const char *genAccNumber(filePath **appdatafilename, int status, char *accNum)
         FILE *tmpfile = fopen("temp.tmp", "w");
         fscanf(appdatafile, "%d\n", &temp);
         fprintf(tmpfile, "%d", temp);
-        //strncpy(accNumber->accNumber, accNumName, strlen(accNumName));
-        //accNumber->accNumber[strlen(accNumName)] = '\0';
         fprintf(tmpfile, "\n");
-        //for (int i = 0; i < 4; i++)
-        //    fprintf(tmpfile, "%c", accNumber->accNumber[i]);
         fprintf(tmpfile, "%s", accNum);
         fclose(tmpfile);
         fclose(appdatafile);
         remove(appdatafilename[0]);
-        //system("del /f appdata.txt");
         rename("temp.tmp", "appdata.txt");
     }
 
+    free(accNumber);
     return accNumName;
 }
 
@@ -340,6 +336,13 @@ int checkUserInfo(loginInfo *ptr, FILE *usrinfofile)
         }
         cur_line++;
     }
+    free(userName);
+    free(Password);
+    free(jobPosition);
+    free(jobPosition1);
+    free(Position);
+    free(userValid);
+    free(pwdValid);
     return loginStatus;
 }
 
@@ -434,6 +437,7 @@ void loginScreen(signupInfo *signUp, FILE *filename, int signUpInt)
             staff_Menu(signUp);
     }
     fclose(filename);
+    free(login);
 }
 
 int admin_Portal(loginInfo *user)
@@ -1283,6 +1287,8 @@ void ledgerDetails(ledgerInfo *newLedger, filePath **ledgerCodeFile, filePath **
             }
         } while (exitStatus == FALSE);
     }
+    free(details);
+    free(ptr);
 }
 
 ledgerInfo *newGLedger()
