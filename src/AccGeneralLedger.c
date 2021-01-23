@@ -160,73 +160,80 @@ int getScreenSize(int resolutions[2])
     resolutions[1] = columns;
 }
 
-const char *genAccNumber(filePath **appdatafilename)
+const char *genAccNumber(filePath **appdatafilename, int status, char *accNum)
 {
     ledgerInfo *accNumber = malloc(sizeof(*accNumber));
     FILE *appdatafile = openFileR("appdata.txt");
-    FILE *tmpfile = fopen("temp.tmp", "w");
     static char accNumName[MAXNUMLEN];
     char ctmp[MAXSIZE], c[1024];
     int num[MAXNUMLEN], count = 0, temp, cur_line, tmpc; //xxxx (num1, num2, num3, num4)
-
-    fscanf(appdatafile, "%d\n", &temp);
-    fprintf(tmpfile, "%d", temp);
-    do
+    if (status == 0)
     {
-        fscanf(appdatafile, "%s", ctmp);
-        if (ctmp[3] == '\0')
+
+        fscanf(appdatafile, "%d\n", &temp);
+        do
         {
-            num[0] = 0;
-            num[1] = 0;
-            num[2] = 0;
-            num[3] = 0;
-            goto skip;
+            fscanf(appdatafile, "%s", ctmp);
+            if (ctmp[3] == '\0')
+            {
+                num[0] = 0;
+                num[1] = 0;
+                num[2] = 0;
+                num[3] = 0;
+                goto skip;
+            }
+            count++;
+        } while (!feof(appdatafile));
+        count = 0;
+        for (int i = 0; i < MAXNUMLEN; i++)
+        {
+            num[i] = ctmp[i] - '0';
         }
-        count++;
-    } while (!feof(appdatafile));
-    count = 0;
-    for (int i = 0; i < MAXNUMLEN; i++)
-    {
-        num[i] = ctmp[i] - '0';
+    skip:
+        num[3]++;
+        if (num[3] == 10)
+        {
+            num[2]++;
+            num[3] = 0;
+        }
+        if (num[2] == 10)
+        {
+            num[1]++;
+            num[2] = 0;
+        }
+        if (num[1] == 10)
+        {
+            num[0]++;
+            num[1] = 0;
+        }
+        if (num[0] == 10)
+        {
+            printf("Oopss... Acc Number out of range...");
+            _Exit(-1);
+        }
+        for (int i = 0; i < MAXNUMLEN; i++)
+        {
+            accNumName[i] = num[i] + '0';
+        }
+        fclose(appdatafile);
     }
-skip:
-    num[3]++;
-    if (num[3] == 10)
+    else
     {
-        num[2]++;
-        num[3] = 0;
+        FILE *tmpfile = fopen("temp.tmp", "w");
+        fscanf(appdatafile, "%d\n", &temp);
+        fprintf(tmpfile, "%d", temp);
+        //strncpy(accNumber->accNumber, accNumName, strlen(accNumName));
+        //accNumber->accNumber[strlen(accNumName)] = '\0';
+        fprintf(tmpfile, "\n");
+        //for (int i = 0; i < 4; i++)
+        //    fprintf(tmpfile, "%c", accNumber->accNumber[i]);
+        fprintf(tmpfile, "%s", accNum);
+        fclose(tmpfile);
+        fclose(appdatafile);
+        remove(appdatafilename[0]);
+        //system("del /f appdata.txt");
+        rename("temp.tmp", "appdata.txt");
     }
-    if (num[2] == 10)
-    {
-        num[1]++;
-        num[2] = 0;
-    }
-    if (num[1] == 10)
-    {
-        num[0]++;
-        num[1] = 0;
-    }
-    if (num[0] == 10)
-    {
-        printf("Oopss... Acc Number out of range...");
-        _Exit(-1);
-    }
-    for (int i = 0; i < MAXNUMLEN; i++)
-    {
-        accNumName[i] = num[i] + '0';
-    }
-
-    strncpy(accNumber->accNumber, accNumName, strlen(accNumName));
-    accNumber->accNumber[strlen(accNumName)] = '\0';
-    fprintf(tmpfile, "\n");
-    for (int i = 0; i < 4; i++)
-        fprintf(tmpfile, "%c", accNumber->accNumber[i]);
-
-    fclose(tmpfile);
-    fclose(appdatafile);
-    remove(appdatafilename[0]);
-    //system("del /f appdata.txt");
-    rename("temp.tmp", "appdata.txt");
 
     return accNumName;
 }
@@ -1086,7 +1093,7 @@ void ledgerDetails(ledgerInfo *newLedger, filePath **ledgerCodeFile, filePath **
     int exitStatus = FALSE;
     int day, month, year;
     char *lCode = malloc(sizeof(*lCode));
-    char *ledgerDetails = malloc(sizeof(*ledgerDetails));
+    char *ledgerDetail = malloc(sizeof(*ledgerDetails));
     char c;
     int codeAmount = 0;
     ledgerCode *ptr = malloc(sizeof(*ptr));
@@ -1098,10 +1105,10 @@ void ledgerDetails(ledgerInfo *newLedger, filePath **ledgerCodeFile, filePath **
         char readString[1024];
         while (fgets(readString, sizeof(readString), codelist) != NULL)
         {
-            sscanf(readString, "%s %[^\n]\n", lCode, ledgerDetails);
+            sscanf(readString, "%s %[^\n]\n", lCode, ledgerDetail);
             sprintf(ptr->ledgerCode[codeAmount], "%s", lCode);
             //memcpy(ptr->ledgerCode[codeAmount], lCode, sizeof(lCode));
-            sprintf(ptr->description[codeAmount], "%s", ledgerDetails);
+            sprintf(ptr->description[codeAmount], "%s", ledgerDetail);
             //memcpy(ptr->description[codeAmount], ledgerDetails, sizeof(ledgerDetails));
             codeAmount++;
         }
@@ -1157,7 +1164,7 @@ void ledgerDetails(ledgerInfo *newLedger, filePath **ledgerCodeFile, filePath **
             }
         } while ((int)(ch) != 13);
         //memcpy(details->ledgerCode[numOfLedgers], &lCode[i], 8);
-        sprintf(details->ledgerCode[numOfLedgers], "%s", &lCode[i]);
+        sprintf(details->ledgerCode[numOfLedgers], "%s", ptr->ledgerCode[i]);
         printf("\nDate: (dd/MM/yyyy format)\n");
         printf("<t>Today || <n> specific date\n");
         get_Date(&day, &month, &year);
@@ -1181,8 +1188,9 @@ void ledgerDetails(ledgerInfo *newLedger, filePath **ledgerCodeFile, filePath **
     {
         FILE *ledgerFile = fopen(newLedger->accNumber, "a+");
         FILE *ledgerListFile = openFileA(ledgerListFileName[0]);
+        genAccNumber(signUpInfo(), 1, newLedger->accNumber);
         for (int i = 0; i < numOfLedgers; i++)
-            fprintf(ledgerFile, "%d/%d/%d\t%s\t%.2lf\t%s\n\n", details->dt.day[i], details->dt.month[i], details->dt.year[i], details->ledgerCode[i], details->credit_debit[i], details->description[i]);
+            fprintf(ledgerFile, "%d/%d/%d\t%s\t%.2lf\t%s\n\n", details->dt.day[i], details->dt.month[i], details->dt.year[i], details->ledgerCode[i], details->credit_debit[i], details->description[i]); //!!REMIND
         fprintf(ledgerListFile, "%d/%d/%d\t%s\t%d\t%s\n\n", newLedger->dt.day[0], newLedger->dt.month[0], newLedger->dt.year[0], newLedger->accNumber, 0, newLedger->description);
         fclose(ledgerListFile);
         fclose(ledgerFile);
@@ -1280,7 +1288,7 @@ void ledgerDetails(ledgerInfo *newLedger, filePath **ledgerCodeFile, filePath **
 ledgerInfo *newGLedger()
 {
     ledgerInfo *newLedger = malloc(sizeof(*newLedger));
-    memcpy(newLedger->accNumber, genAccNumber(signUpInfo()), 6);
+    memcpy(newLedger->accNumber, genAccNumber(signUpInfo(), 0, NULL), 6);
     char *accType = malloc(sizeof(*accType));
     double initBal[MAXSIZE];
     int codeAmount = 0;
@@ -1441,12 +1449,16 @@ struct checkStatus trackAccNumber(char accnumber[MAXSIZE], filePath **ledgerList
         sprintf(Status.date, "%d/%d/%d", day, month, year);
 
         if (strcmp(accnumber, validation) == 0)
+        {
             Status.status = 1;
-        else if (strcmp(accnumber, validation) == 1)
+            goto valid;
+        }
+        else
             continue;
     }
     if (Status.status == 0)
         printf("\nNo such file. Please try again.\n");
+valid:
     if (Status.approved <= 0)
     {
         printf("\nThis ledger is not approved. Please get a approval.\n");
@@ -1494,10 +1506,10 @@ void writeFileContent(FILE *file, char *date, char *ledgerCode, char *descriptio
 
     if (*num == 0)
     {
-        fprintf(file, "%s\t\t%s\t\t%s\t\t\t\t\t%.2lf\n", ledgerCode, date, description, *balance);
+        fprintf(file, "%s\t\t%s\t\t%s\t\t\t\t\t\t%.2lf\n", ledgerCode, date, description, *balance);
     }
     else
-        fprintf(file, "%s\t\t%s\t\t%s\t\t%.2lf\t\t%.2lf\n", ledgerCode, date, description, *amount, *balance);
+        fprintf(file, "%s\t\t%s\t\t%s\t\t\t\t%.2lf        %.2lf\n", ledgerCode, date, description, *amount, *balance);
 }
 
 void readFile(FILE *file, FILE *report)
@@ -1566,7 +1578,7 @@ int ReportGenerationMenu(void)
         ptr = stat.date;
         valid = stat.status;
         approved = stat.approved;
-        if (valid == 0 && approved >= 0)
+        if (valid == 0 && approved <= 0)
         {
             printf("(Press any key to continue)");
             int ch;
@@ -1699,6 +1711,7 @@ void viewDetails(FILE *file, char *name)
     while (fgets(readString, sizeof(readString), file) != NULL)
     {
         sscanf(readString, "%d/%d/%d %s %lf %[^\n]\n\n", &day, &month, &year, ledgerCode, &amount, description);
+
         if (i == 0)
         {
             printf("%d/%d/%d\t%s\t\t\t%s\t\t%.2lf\n", day, month, year, ledgerCode, description, amount);
@@ -1748,17 +1761,26 @@ int approvalLedger(filePath **ledgerListFile)
                 FILE *tmpfile = fopen("temp.txt", "w");
                 FILE *file = openFileR(ledgerListFile[0]);
                 char readString[1024];
-                int day, month, year, approval;
+                int day, month, year, approval, i;
                 char *accNumber = malloc(sizeof(*accNumber));
                 char *description = malloc(sizeof(*description));
 
                 while (fgets(readString, sizeof(readString), file) != NULL)
                 {
-                    sscanf(readString, "%d/%d/%d %s %d %[^\n]\n\n\n", &day, &month, &year, accNumber, &approval, description);
-                    if (strcmp(accNumber, (approve->ledgerCode.ledgerCode[0])) == 0)
-                        fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n", day, month, year, accNumber, 1, description);
-                    else
-                        fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n", day, month, year, accNumber, -1, description);
+                    sscanf(readString, "%d/%d/%d %s %d %[^\n]\n", &day, &month, &year, accNumber, &approval, description);
+                    if (i == 0)
+                    {
+                        if (strcmp(accNumber, (approve->ledgerCode.ledgerCode[0])) == 0)
+                            fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n\n", day, month, year, accNumber, 1, description);
+                        else
+                            fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n\n", day, month, year, accNumber, approval, description);
+                        i++;
+                    }
+                    else if (i == 1)
+                    {
+                        i--;
+                        continue;
+                    }
                 }
                 fclose(file);
                 fclose(tmpfile);
@@ -1769,21 +1791,45 @@ int approvalLedger(filePath **ledgerListFile)
             }
             else if (ch == 'n')
             {
-                printf("Ledger Account Number (%s) is not approved.", approve->ledgerCode.ledgerCode[0]);
+                printf("\nLedger Account Number (%s) is not approved.", approve->ledgerCode.ledgerCode[0]);
+                printf("\n(Press any key to continue)");
+                int ch;
+                while (1)
+                {
+
+                    if (kbhit())
+                    {
+                        ch = getch();
+                        system("cls");
+                        break;
+                    }
+                }
                 system("cls");
                 FILE *tmpfile = fopen("temp.txt", "w");
                 FILE *file = openFileR(ledgerListFile[0]);
                 char readString[1024];
-                int day, month, year, approval;
+                int day, month, year, approval, i = 0;
                 char *accNumber = malloc(sizeof(*accNumber));
                 char *description = malloc(sizeof(*description));
 
                 while (fgets(readString, sizeof(readString), file) != NULL)
                 {
-                    sscanf(readString, "%d/%d/%d %s %d %[^\n]\n\n\n", &day, &month, &year, accNumber, &approval, description);
-                    if (strcmp(accNumber, (approve->ledgerCode.ledgerCode[0])) == 0)
-                        fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n", day, month, year, accNumber, -1, description);
+                    sscanf(readString, "%d/%d/%d %s %d %[^\n]\n\n", &day, &month, &year, accNumber, &approval, description);
+                    if (i == 0)
+                    {
+                        if (strcmp(accNumber, (approve->ledgerCode.ledgerCode[0])) == 0)
+                            fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n\n", day, month, year, accNumber, -1, description);
+                        else
+                            fprintf(tmpfile, "%d/%d/%d\t%s\t\t%d\t%s\n\n", day, month, year, accNumber, approval, description);
+                        i++;
+                    }
+                    else if (i == 1)
+                    {
+                        i--;
+                        continue;
+                    }
                 }
+
                 fclose(file);
                 fclose(tmpfile);
                 remove(ledgerListFile[0]);
